@@ -1,0 +1,889 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [hstore(schema: "public")]
+}
+
+model activities {
+  id              BigInt    @id(map: "activities_pk") @default(autoincrement())
+  hash            String?   @unique(map: "activities_hash_unique_index")
+  type            String
+  contract        Bytes?
+  collection_id   String?
+  token_id        Decimal?  @db.Decimal(78, 0)
+  from_address    Bytes?
+  to_address      Bytes?
+  price           Decimal?  @db.Decimal(78, 0)
+  amount          Decimal?  @db.Decimal(78, 0)
+  metadata        Json?
+  block_hash      Bytes?
+  event_timestamp Int?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  order_id        String?
+
+  @@index([block_hash], map: "activities_block_hash_index")
+  @@index([collection_id, created_at(sort: Desc), type], map: "activities_collection_id_created_at_type_index")
+  @@index([collection_id, event_timestamp(sort: Desc), type], map: "activities_collection_id_event_timestamp_type_index")
+  @@index([contract, token_id, created_at(sort: Desc), type], map: "activities_contract_token_id_created_at_type_index")
+  @@index([contract, token_id, event_timestamp(sort: Desc), type], map: "activities_contract_token_id_event_timestamp_type_index")
+}
+
+model api_keys {
+  key         String    @id(map: "api_keys_pk")
+  app_name    String
+  website     String
+  email       String
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  active      Boolean   @default(true)
+  tier        Int       @default(0)
+  permissions Json?
+}
+
+model attribute_keys {
+  id              BigInt               @id(map: "attribute_keys_pk") @default(autoincrement())
+  collection_id   String
+  key             String
+  kind            attribute_key_kind_t
+  rank            Int?
+  attribute_count Int                  @default(0)
+  info            Json?
+  created_at      DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime             @default(now()) @db.Timestamptz(6)
+
+  @@unique([collection_id, key], map: "attribute_keys_collection_id_key_unique_index")
+  @@index([updated_at, id], map: "attribute_keys_updated_at_id_index")
+}
+
+model attributes {
+  id               BigInt                @id(map: "attributes_pk") @default(autoincrement())
+  attribute_key_id Int
+  value            String
+  token_count      Int                   @default(0)
+  on_sale_count    Int                   @default(0)
+  floor_sell_value Decimal?              @db.Decimal(78, 0)
+  top_buy_value    Decimal?              @db.Decimal(78, 0)
+  sell_updated_at  DateTime?             @db.Timestamptz(6)
+  buy_updated_at   DateTime?             @db.Timestamptz(6)
+  sample_images    String[]
+  collection_id    String?
+  kind             attribute_key_kind_t?
+  key              String?
+  created_at       DateTime              @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime              @default(now()) @db.Timestamptz(6)
+
+  @@unique([attribute_key_id, value], map: "attributes_attribute_key_id_value_unique_index")
+  @@index([collection_id, floor_sell_value(sort: Desc)], map: "attributes_collection_id_floor_sell_value_index")
+  @@index([key, collection_id, floor_sell_value(sort: Desc)], map: "attributes_key_collection_id_floor_sell_value_index")
+  @@index([updated_at, id], map: "attributes_updated_at_id_index")
+}
+
+model bid_events {
+  id                       BigInt                        @id(map: "bid_events_pk") @default(autoincrement())
+  kind                     token_floor_sell_event_kind_t
+  status                   order_event_status_t
+  contract                 Bytes
+  token_set_id             String
+  order_id                 String
+  order_source_id_int      Int?
+  order_valid_between      Unsupported("tstzrange")?
+  order_quantity_remaining Decimal?                      @db.Decimal(78, 0)
+  maker                    Bytes?
+  price                    Decimal?                      @db.Decimal(78, 0)
+  value                    Decimal?                      @db.Decimal(78, 0)
+  tx_hash                  Bytes?
+  tx_timestamp             Int?
+  created_at               DateTime                      @default(now()) @db.Timestamptz(6)
+  order_nonce              Decimal?                      @db.Decimal(78, 0)
+
+  @@index([contract, created_at, id], map: "bid_events_contract_created_at_id_index")
+  @@index([created_at, id], map: "bid_events_created_at_id_index")
+}
+
+model blocks {
+  hash      Bytes
+  number    Int
+  timestamp Int?
+
+  @@id([number, hash], map: "blocks_pk")
+}
+
+model bulk_cancel_events {
+  address     Bytes
+  block       Int
+  block_hash  Bytes
+  tx_hash     Bytes
+  tx_index    Int
+  log_index   Int
+  timestamp   Int
+  batch_index Int
+  order_kind  order_kind_t
+  maker       Bytes
+  min_nonce   Decimal      @db.Decimal(78, 0)
+
+  @@id([tx_hash, log_index, batch_index], map: "bulk_cancel_events_pk")
+  @@index([block, block_hash], map: "bulk_cancel_events_block_block_hash_index")
+  @@index([order_kind, maker, min_nonce(sort: Desc)], map: "bulk_cancel_events_order_kind_maker_min_nonce")
+}
+
+model bundle_items {
+  bundle_id    BigInt
+  kind         bundle_item_kind_t
+  token_set_id String
+  amount       Decimal            @default(1) @db.Decimal
+
+  @@id([bundle_id, token_set_id], map: "bundle_items_pk")
+  @@index([token_set_id, bundle_id], map: "bundle_items_token_set_id_bundle_id_index")
+}
+
+model bundles {
+  id       BigInt @id(map: "bundles_pk") @default(autoincrement())
+  metadata Json?
+}
+
+model cancel_events {
+  address    Bytes
+  block      Int
+  block_hash Bytes
+  tx_hash    Bytes
+  tx_index   Int
+  log_index  Int
+  timestamp  Int
+  order_kind order_kind_t
+  order_id   String
+
+  @@id([block_hash, tx_hash, log_index], map: "cancel_events_pk")
+  @@index([block, block_hash], map: "cancel_events_block_block_hash_index")
+  @@index([order_id, timestamp], map: "cancel_events_order_id_timestamp_index")
+}
+
+model collection_floor_sell_events {
+  id                  BigInt                        @id(map: "collection_floor_sell_events_pk") @default(autoincrement())
+  kind                token_floor_sell_event_kind_t
+  collection_id       String
+  contract            Bytes
+  token_id            Decimal                       @db.Decimal(78, 0)
+  order_id            String?
+  order_source_id     Bytes?
+  order_source_id_int Int?
+  order_valid_between Unsupported("tstzrange")?
+  maker               Bytes?
+  price               Decimal?                      @db.Decimal(78, 0)
+  previous_price      Decimal?                      @db.Decimal(78, 0)
+  tx_hash             Bytes?
+  tx_timestamp        Int?
+  created_at          DateTime                      @default(now()) @db.Timestamptz(6)
+
+  @@index([collection_id, created_at, id], map: "collection_floor_sell_events_collection_id_created_at_id_index")
+  @@index([created_at, id], map: "collection_floor_sell_events_created_at_id_index")
+}
+
+model collection_top_bid_events {
+  id                  BigInt                        @id(map: "collection_top_bid_events_pk") @default(autoincrement())
+  kind                token_floor_sell_event_kind_t
+  collection_id       String
+  contract            Bytes
+  token_set_id        String
+  order_id            String?
+  order_source_id     Bytes?
+  order_source_id_int Int?
+  order_valid_between Unsupported("tstzrange")?
+  maker               Bytes?
+  price               Decimal?                      @db.Decimal(78, 0)
+  previous_price      Decimal?                      @db.Decimal(78, 0)
+  tx_hash             Bytes?
+  tx_timestamp        Int?
+  created_at          DateTime                      @default(now()) @db.Timestamptz(6)
+
+  @@index([collection_id, created_at, id], map: "collection_top_bid_events_collection_id_created_at_id_index")
+  @@index([created_at, id], map: "collection_top_bid_events_created_at_id_index")
+}
+
+model collections {
+  id                       String                    @id(map: "collections_pk")
+  slug                     String
+  name                     String
+  metadata                 Json?
+  royalties                Json?
+  community                String?
+  index_metadata           Boolean?
+  contract                 Bytes
+  token_id_range           Unsupported("numrange")?
+  token_set_id             String?
+  token_count              Int                       @default(0)
+  created_at               DateTime?                 @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime?                 @default(now()) @db.Timestamptz(6)
+  last_metadata_sync       DateTime?                 @db.Timestamptz(6)
+  minted_timestamp         Int?
+  floor_sell_id            String?
+  floor_sell_value         Decimal?                  @db.Decimal(78, 0)
+  floor_sell_maker         Bytes?
+  floor_sell_source_id     Bytes?
+  floor_sell_source_id_int Int?
+  floor_sell_valid_between Unsupported("tstzrange")?
+  day1_volume              Decimal?                  @default(0) @db.Decimal(78, 0)
+  day1_rank                Int?
+  day7_volume              Decimal?                  @default(0) @db.Decimal(78, 0)
+  day7_rank                Int?
+  day30_volume             Decimal?                  @default(0) @db.Decimal(78, 0)
+  day30_rank               Int?
+  all_time_volume          Decimal?                  @default(0) @db.Decimal(78, 0)
+  all_time_rank            Int?
+  day1_volume_change       Float?
+  day7_volume_change       Float?
+  day30_volume_change      Float?
+  day1_floor_sell_value    Decimal?                  @db.Decimal(78, 0)
+  day7_floor_sell_value    Decimal?                  @db.Decimal(78, 0)
+  day30_floor_sell_value   Decimal?                  @db.Decimal(78, 0)
+  non_flagged_token_set_id String?
+  top_buy_id               String?
+  top_buy_value            Decimal?                  @db.Decimal(78, 0)
+  top_buy_maker            Bytes?
+  top_buy_source_id_int    Int?
+  top_buy_valid_between    Unsupported("tstzrange")?
+  new_royalties            Json?
+
+  @@index([all_time_volume(sort: Desc)], map: "collections_all_time_volume_index")
+  @@index([community], map: "collections_community_index")
+  @@index([contract, token_id_range, id], map: "collections_contract_token_id_range_index")
+  @@index([created_at], map: "collections_created_at_index")
+  @@index([day1_volume(sort: Desc)], map: "collections_day1_volume_index")
+  @@index([day30_volume(sort: Desc)], map: "collections_day30_volume_index")
+  @@index([day7_volume(sort: Desc)], map: "collections_day7_volume_index")
+  @@index([minted_timestamp(sort: Desc)], map: "collections_minted_timestamp_index")
+  @@index([name(ops: raw("gin_trgm_ops"))], map: "collections_name_index", type: Gin)
+  @@index([slug], map: "collections_slug_index")
+  @@index([updated_at, id], map: "collections_updated_at_id_index")
+}
+
+model collections_sets {
+  id               BigInt  @id(map: "collections_sets_pk") @default(autoincrement())
+  collections_hash String? @unique(map: "collections_sets_collections_hash_unique_index")
+}
+
+model collections_sets_collections {
+  collections_set_id String
+  collection_id      String
+
+  @@id([collections_set_id, collection_id], map: "collections_sets_collections_pk")
+}
+
+model contracts {
+  address Bytes           @id(map: "contracts_pk")
+  kind    contract_kind_t
+}
+
+model currencies {
+  contract Bytes   @id(map: "currencies_pk")
+  name     String?
+  symbol   String?
+  decimals Int?    @db.SmallInt
+  metadata Json?
+}
+
+model daily_volumes {
+  collection_id          String
+  timestamp              Int
+  volume                 Decimal  @db.Decimal(78, 0)
+  rank                   Int
+  floor_sell_value       Decimal? @db.Decimal(78, 0)
+  sales_count            Int?
+  volume_clean           Decimal? @db.Decimal(78, 0)
+  rank_clean             Int?
+  floor_sell_value_clean Decimal? @db.Decimal(78, 0)
+  sales_count_clean      Int?
+
+  @@id([collection_id, timestamp], map: "daily_volumes_pk")
+}
+
+model data_export_tasks {
+  id              Int      @id @default(autoincrement())
+  source          String   @unique(map: "data_export_tasks_source_unique_index")
+  cursor          Json?
+  sequence_number Int      @default(1)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model fill_events_2 {
+  address              Bytes
+  block                Int
+  block_hash           Bytes
+  tx_hash              Bytes
+  tx_index             Int
+  log_index            Int
+  timestamp            Int
+  batch_index          Int
+  order_kind           order_kind_t
+  order_source_id_int  Int?
+  order_id             String?
+  order_side           order_side_t
+  maker                Bytes
+  taker                Bytes
+  price                Decimal        @db.Decimal(78, 0)
+  contract             Bytes
+  token_id             Decimal        @db.Decimal(78, 0)
+  amount               Decimal        @db.Decimal(78, 0)
+  fill_source          fill_source_t?
+  created_at           DateTime       @default(now()) @db.Timestamptz(6)
+  fill_source_id       Int?
+  aggregator_source_id Int?
+  wash_trading_score   Float?
+  currency             Bytes          @default("AAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+  currency_price       Decimal?       @db.Decimal
+  usd_price            Decimal?       @db.Decimal
+  updated_at           DateTime       @default(now()) @db.Timestamptz(6)
+  is_primary           Boolean?
+
+  @@id([tx_hash, log_index, batch_index], map: "fill_events_2_pk")
+  @@index([block, block_hash], map: "fill_events_2_block_block_hash_index")
+  @@index([contract, timestamp, log_index, batch_index], map: "fill_events_2_contract_timestamp_index")
+  @@index([contract, token_id, timestamp, log_index, batch_index], map: "fill_events_2_contract_token_id_timestamp_index")
+  @@index([created_at, tx_hash, log_index, batch_index], map: "fill_events_2_created_at_tx_hash_index")
+  @@index([maker, taker, contract], map: "fill_events_2_maker_taker_contract")
+  @@index([order_id, timestamp], map: "fill_events_2_order_id_timestamp_index")
+  @@index([timestamp, log_index, batch_index], map: "fill_events_2_timestamp_index")
+  @@index([updated_at, tx_hash, log_index, batch_index], map: "fill_events_2_updated_at_tx_hash_index")
+}
+
+model flagged_addresses {
+  address    Bytes    @id(map: "flagged_addresses_pk")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model ft_approvals {
+  token   Bytes
+  owner   Bytes
+  spender Bytes
+  value   Decimal @db.Decimal
+
+  @@id([token, owner, spender], map: "ft_approvals_pk")
+}
+
+model ft_balances {
+  contract Bytes
+  owner    Bytes
+  amount   Decimal @db.Decimal(78, 0)
+
+  @@id([contract, owner], map: "ft_balances_pk")
+}
+
+model ft_transfer_events {
+  address    Bytes
+  block      Int
+  block_hash Bytes
+  tx_hash    Bytes
+  tx_index   Int
+  log_index  Int
+  timestamp  Int
+  from       Bytes
+  to         Bytes
+  amount     Decimal @db.Decimal(78, 0)
+
+  @@id([tx_hash, log_index], map: "ft_transfer_events_pk")
+  @@index([block, block_hash], map: "ft_transfer_events_block_block_hash_index")
+}
+
+model nft_approval_events {
+  address     Bytes
+  block       Int
+  block_hash  Bytes
+  tx_hash     Bytes
+  tx_index    Int
+  log_index   Int
+  timestamp   Int
+  batch_index Int
+  owner       Bytes
+  operator    Bytes
+  approved    Boolean
+
+  @@id([tx_hash, log_index, batch_index], map: "nft_approval_events_pk")
+  @@index([address, owner, operator, block(sort: Desc), approved], map: "nft_approval_events_address_owner_operator_block_index")
+  @@index([block, block_hash], map: "nft_approval_events_block_block_hash_index")
+}
+
+model nft_balances {
+  contract         Bytes
+  token_id         Decimal   @db.Decimal(78, 0)
+  owner            Bytes
+  amount           Decimal   @db.Decimal(78, 0)
+  acquired_at      DateTime? @db.Timestamptz(6)
+  floor_sell_id    String?
+  floor_sell_value Decimal?  @db.Decimal(78, 0)
+  top_buy_id       String?
+  top_buy_value    Decimal?  @db.Decimal(78, 0)
+  top_buy_maker    Bytes?
+
+  @@id([contract, token_id, owner, amount], map: "nft_balances_pk")
+}
+
+model nft_transfer_events {
+  address     Bytes
+  block       Int
+  block_hash  Bytes
+  tx_hash     Bytes
+  tx_index    Int
+  log_index   Int
+  timestamp   Int
+  batch_index Int
+  from        Bytes
+  to          Bytes
+  token_id    Decimal @db.Decimal(78, 0)
+  amount      Decimal @db.Decimal(78, 0)
+
+  @@id([tx_hash, log_index, batch_index], map: "nft_transfer_events_pk")
+  @@index([address, timestamp(sort: Desc)], map: "nft_transfer_events_address_timestamp_index")
+  @@index([address, token_id, timestamp(sort: Desc)], map: "nft_transfer_events_address_token_id_timestamp_index")
+  @@index([block, block_hash], map: "nft_transfer_events_block_block_hash_index")
+  @@index([timestamp(sort: Desc)], map: "nft_transfer_events_timestamp_index")
+}
+
+model nftx_ft_pools {
+  address Bytes @id(map: "nftx_ft_pools_pk")
+  token0  Bytes
+  token1  Bytes
+}
+
+model nftx_nft_pools {
+  address  Bytes @id(map: "nftx_nft_pools_pk")
+  nft      Bytes
+  vault_id Int
+}
+
+model nonce_cancel_events {
+  address     Bytes
+  block       Int
+  block_hash  Bytes
+  tx_hash     Bytes
+  tx_index    Int
+  log_index   Int
+  timestamp   Int
+  batch_index Int
+  order_kind  order_kind_t
+  maker       Bytes
+  nonce       Decimal      @db.Decimal(78, 0)
+
+  @@id([tx_hash, log_index, batch_index], map: "nonce_cancel_events_pk")
+  @@index([block, block_hash], map: "nonce_cancel_events_block_block_hash_index")
+  @@index([order_kind, maker, nonce], map: "nonce_cancel_events_order_kind_maker_nonce_index")
+}
+
+model order_events {
+  id                       BigInt                        @id(map: "order_events_pk") @default(autoincrement())
+  kind                     token_floor_sell_event_kind_t
+  status                   order_event_status_t
+  contract                 Bytes
+  token_id                 Decimal                       @db.Decimal(78, 0)
+  order_id                 String
+  order_source_id          Bytes?
+  order_source_id_int      Int?
+  order_valid_between      Unsupported("tstzrange")?
+  order_quantity_remaining Decimal?                      @db.Decimal(78, 0)
+  maker                    Bytes?
+  price                    Decimal?                      @db.Decimal(78, 0)
+  tx_hash                  Bytes?
+  tx_timestamp             Int?
+  created_at               DateTime                      @default(now()) @db.Timestamptz(6)
+  order_nonce              Decimal?                      @db.Decimal(78, 0)
+
+  @@index([contract, created_at, id], map: "order_events_contract_created_at_id_index")
+  @@index([created_at, id], map: "order_events_created_at_id_index")
+}
+
+model orders {
+  id                      String                      @id(map: "orders_pk")
+  kind                    order_kind_t
+  side                    order_side_t?
+  fillability_status      order_fillability_status_t?
+  approval_status         order_approval_status_t?
+  token_set_id            String?
+  token_set_schema_hash   Bytes?
+  maker                   Bytes?
+  taker                   Bytes?
+  price                   Decimal?                    @db.Decimal(78, 0)
+  value                   Decimal?                    @db.Decimal(78, 0)
+  quantity_filled         Decimal?                    @default(0) @db.Decimal(78, 0)
+  quantity_remaining      Decimal?                    @default(1) @db.Decimal(78, 0)
+  valid_between           Unsupported("tstzrange")?
+  nonce                   Decimal?                    @db.Decimal(78, 0)
+  source_id               Bytes?
+  source_id_int           Int?
+  contract                Bytes?
+  conduit                 Bytes?
+  fee_bps                 Int?
+  fee_breakdown           Json?
+  dynamic                 Boolean?
+  raw_data                Json?
+  is_reservoir            Boolean?
+  expiration              DateTime?                   @db.Timestamptz(6)
+  created_at              DateTime?                   @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime?                   @default(now()) @db.Timestamptz(6)
+  bundle_kind             order_bundle_kind_t?
+  offer_bundle_id         BigInt?
+  consideration_bundle_id BigInt?
+  currency                Bytes                       @default("AAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+  currency_price          Decimal?                    @db.Decimal(78, 0)
+  currency_value          Decimal?                    @db.Decimal(78, 0)
+  needs_conversion        Boolean?
+
+  @@index([updated_at, id], map: "orders_updated_at_id_index")
+}
+
+model pgmigrations {
+  id     Int      @id @default(autoincrement())
+  name   String   @db.VarChar(255)
+  run_on DateTime @db.Timestamp(6)
+}
+
+model rate_limit_rules {
+  id         Int      @id @default(autoincrement())
+  route      String
+  method     String   @default("")
+  tier       Int?
+  api_key    String   @default("")
+  options    Json
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model removed_attribute_keys {
+  id              BigInt               @id(map: "removed_attribute_keys_pk")
+  collection_id   String
+  key             String
+  kind            attribute_key_kind_t
+  rank            Int?
+  attribute_count Int
+  info            Json?
+  created_at      DateTime             @db.Timestamptz(6)
+  deleted_at      DateTime             @default(now()) @db.Timestamptz(6)
+
+  @@index([deleted_at, id], map: "removed_attribute_keys_deleted_at_id_index")
+}
+
+model removed_attributes {
+  id               BigInt                @id(map: "removed_attributes_pk")
+  attribute_key_id Int
+  value            String
+  token_count      Int
+  on_sale_count    Int
+  floor_sell_value Decimal?              @db.Decimal(78, 0)
+  top_buy_value    Decimal?              @db.Decimal(78, 0)
+  sell_updated_at  DateTime?             @db.Timestamptz(6)
+  buy_updated_at   DateTime?             @db.Timestamptz(6)
+  sample_images    String[]
+  collection_id    String?
+  kind             attribute_key_kind_t?
+  key              String?
+  created_at       DateTime              @db.Timestamptz(6)
+  deleted_at       DateTime              @default(now()) @db.Timestamptz(6)
+
+  @@index([deleted_at, id], map: "removed_attributes_deleted_at_id_index")
+}
+
+model removed_token_attributes {
+  contract      Bytes
+  token_id      Decimal  @db.Decimal(78, 0)
+  attribute_id  BigInt
+  collection_id String
+  key           String
+  value         String
+  created_at    DateTime @db.Timestamptz(6)
+  deleted_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([contract, token_id, attribute_id], map: "removed_token_attributes_pk")
+  @@index([deleted_at, contract, token_id, attribute_id], map: "removed_token_attributes_deleted_at_contract_token_id_attribute")
+}
+
+model sources {
+  source_id String @id(map: "sources_pk")
+  metadata  Json
+}
+
+model sources_v2 {
+  id          Int     @id @default(autoincrement())
+  domain      String  @unique(map: "sources_domain_unique_index")
+  name        String  @unique(map: "sources_name_unique_index")
+  address     String  @unique(map: "sources_address_unique_index")
+  metadata    Json
+  domain_hash String  @unique(map: "sources_domain_hash_unique_index")
+  optimized   Boolean @default(false)
+}
+
+model sudoswap_pools {
+  address       Bytes @id(map: "sudoswap_pools_pk")
+  nft           Bytes
+  token         Bytes
+  bonding_curve Bytes
+  pool_kind     Int   @db.SmallInt
+  pair_kind     Int   @db.SmallInt
+}
+
+model token_attributes {
+  contract      Bytes
+  token_id      Decimal  @db.Decimal(78, 0)
+  attribute_id  BigInt
+  collection_id String
+  key           String
+  value         String
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([contract, token_id, attribute_id], map: "token_attributes_pk")
+  @@unique([attribute_id, contract, token_id], map: "token_attributes_attribute_id_contract_token_id_unique_index")
+  @@index([collection_id, key, value, contract, token_id], map: "token_attributes_collection_id_key_value_index")
+  @@index([contract, token_id, key, value], map: "token_attributes_contract_token_id_key_value_index")
+  @@index([updated_at, contract, token_id, attribute_id], map: "token_attributes_updated_at_contract_token_id_attribute_id_inde")
+}
+
+model token_floor_sell_events {
+  id             BigInt                        @id(map: "token_floor_sell_events_pk") @default(autoincrement())
+  kind           token_floor_sell_event_kind_t
+  contract       Bytes
+  token_id       Decimal                       @db.Decimal(78, 0)
+  order_id       String?
+  maker          Bytes?
+  price          Decimal?                      @db.Decimal(78, 0)
+  source_id_int  Int?
+  valid_between  Unsupported("tstzrange")?
+  nonce          Decimal?                      @db.Decimal(78, 0)
+  previous_price Decimal?                      @db.Decimal(78, 0)
+  tx_hash        Bytes?
+  tx_timestamp   Int?
+  created_at     DateTime                      @default(now()) @db.Timestamptz(6)
+
+  @@index([contract, created_at, id], map: "token_floor_sell_events_contract_created_at_id_index")
+  @@index([contract, token_id, created_at, id], map: "token_floor_sell_events_contract_token_id_created_at_id_index")
+  @@index([created_at, id], map: "token_floor_sell_events_created_at_id_index")
+}
+
+model token_sets {
+  id                 String
+  schema_hash        Bytes
+  schema             Json?
+  metadata           Json?
+  collection_id      String?
+  attribute_id       BigInt?
+  top_buy_id         String?
+  top_buy_value      Decimal? @db.Decimal(78, 0)
+  top_buy_maker      Bytes?
+  last_buy_timestamp Int?
+  last_buy_value     Decimal? @db.Decimal(78, 0)
+
+  @@id([id, schema_hash], map: "token_sets_pk")
+}
+
+model token_sets_tokens {
+  token_set_id String
+  contract     Bytes
+  token_id     Decimal @db.Decimal(78, 0)
+
+  @@id([token_set_id, contract, token_id], map: "token_sets_tokens_pk")
+  @@index([contract, token_id, token_set_id], map: "token_sets_tokens_contract_token_id_index")
+}
+
+model tokens {
+  contract                  Bytes
+  token_id                  Decimal                @db.Decimal(78, 0)
+  name                      String?
+  description               String?
+  image                     String?
+  media                     String?
+  collection_id             String?
+  metadata_indexed          Boolean?
+  attributes                Unsupported("hstore")?
+  floor_sell_id             String?
+  floor_sell_value          Decimal?               @db.Decimal(78, 0)
+  floor_sell_maker          Bytes?
+  floor_sell_valid_from     Int?
+  floor_sell_valid_to       Int?
+  floor_sell_source_id      Bytes?
+  floor_sell_source_id_int  Int?
+  floor_sell_is_reservoir   Boolean?
+  top_buy_id                String?
+  top_buy_value             Decimal?               @db.Decimal(78, 0)
+  top_buy_maker             Bytes?
+  last_sell_timestamp       Int?
+  last_sell_value           Decimal?               @db.Decimal(78, 0)
+  last_buy_timestamp        Int?
+  last_buy_value            Decimal?               @db.Decimal(78, 0)
+  last_metadata_sync        DateTime?              @db.Timestamptz(6)
+  created_at                DateTime?              @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime?              @default(now()) @db.Timestamptz(6)
+  rarity_score              Float?
+  rarity_rank               Int?
+  is_flagged                Int?                   @default(0)
+  last_flag_update          DateTime?              @db.Timestamptz(6)
+  floor_sell_currency       Bytes?
+  floor_sell_currency_value Decimal?               @db.Decimal(78, 0)
+
+  @@id([contract, token_id], map: "tokens_pk")
+  @@index([collection_id, contract, token_id], map: "tokens_collection_id_contract_token_id_index")
+  @@index([collection_id, floor_sell_value, token_id], map: "tokens_collection_id_floor_sell_value_token_id_index")
+  @@index([collection_id, is_flagged, token_id], map: "tokens_collection_id_is_flagged_index")
+  @@index([collection_id, rarity_score(sort: Desc), token_id], map: "tokens_collection_id_rarity_score_token_id_index")
+  @@index([collection_id, floor_sell_source_id, floor_sell_value], map: "tokens_collection_id_source_id_floor_sell_value_index")
+  @@index([collection_id, top_buy_value(sort: Desc), token_id(sort: Desc)], map: "tokens_collection_id_top_buy_value_token_id_index")
+  @@index([contract, floor_sell_value], map: "tokens_contract_floor_sell_value_index")
+  @@index([contract, token_id, floor_sell_value, top_buy_value], map: "tokens_contract_token_id_index")
+  @@index([contract, top_buy_value(sort: Desc)], map: "tokens_contract_top_buy_value_index")
+  @@index([top_buy_maker, collection_id, top_buy_value], map: "tokens_top_buy_maker_collection_id_index")
+  @@index([updated_at, contract, token_id], map: "tokens_updated_at_contract_token_id_index")
+}
+
+model transaction_logs {
+  hash Bytes @id(map: "transaction_logs_pk")
+  logs Json
+}
+
+model transaction_traces {
+  hash  Bytes @id(map: "transaction_traces_pk")
+  calls Json
+}
+
+model transactions {
+  hash            Bytes    @id(map: "transactions_pk")
+  from            Bytes
+  to              Bytes
+  value           Decimal  @db.Decimal
+  data            Bytes?
+  block_number    Int?
+  block_timestamp Int?
+  gas_used        Decimal? @db.Decimal
+  gas_price       Decimal? @db.Decimal
+  gas_fee         Decimal? @db.Decimal
+
+  @@index([to], map: "transactions_to_index")
+}
+
+model usd_prices {
+  currency  Bytes
+  timestamp DateTime @db.Timestamptz(6)
+  value     Decimal  @db.Decimal
+
+  @@id([currency, timestamp], map: "usd_prices_pk")
+}
+
+model user_activities {
+  id              BigInt    @id(map: "user_activities_pk") @default(autoincrement())
+  hash            String?
+  type            String
+  contract        Bytes?
+  collection_id   String?
+  token_id        Decimal?  @db.Decimal(78, 0)
+  address         Bytes?
+  from_address    Bytes?
+  to_address      Bytes?
+  price           Decimal?  @db.Decimal(78, 0)
+  amount          Decimal?  @db.Decimal(78, 0)
+  metadata        Json?
+  block_hash      Bytes?
+  event_timestamp Int?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+  order_id        String?
+
+  @@unique([hash, address], map: "user_activities_hash_address_unique_index")
+  @@index([address, created_at(sort: Desc), type], map: "user_activities_address_created_at_type_index")
+  @@index([address, event_timestamp(sort: Desc), type], map: "user_activities_address_event_timestamp_type_index")
+  @@index([block_hash], map: "user_activities_block_hash_index")
+}
+
+model wyvern_proxies {
+  owner Bytes @id(map: "wyvern_proxies_pk")
+  proxy Bytes
+}
+
+enum attribute_key_kind_t {
+  string
+  number
+  date
+  range
+}
+
+enum bundle_item_kind_t {
+  ft
+  nft
+}
+
+enum contract_kind_t {
+  erc721
+  erc1155
+  cryptopunks
+}
+
+enum fill_source_t {
+  reservoir
+  gem
+  genie
+}
+
+enum order_approval_status_t {
+  approved
+  no_approval @map("no-approval")
+  disabled
+}
+
+enum order_bundle_kind_t {
+  bundle_ask @map("bundle-ask")
+}
+
+enum order_event_status_t {
+  active
+  inactive
+  filled
+  cancelled
+  expired
+}
+
+enum order_fillability_status_t {
+  fillable
+  no_balance @map("no-balance")
+  cancelled
+  filled
+  expired
+}
+
+enum order_kind_t {
+  wyvern_v2         @map("wyvern-v2")
+  wyvern_v2_3       @map("wyvern-v2.3")
+  looks_rare        @map("looks-rare")
+  opendao_erc721    @map("opendao-erc721")
+  opendao_erc1155   @map("opendao-erc1155")
+  zeroex_v4_erc721  @map("zeroex-v4-erc721")
+  zeroex_v4_erc1155 @map("zeroex-v4-erc1155")
+  foundation
+  x2y2
+  seaport
+  element_erc721    @map("element-erc721")
+  element_erc1155   @map("element-erc1155")
+  rarible
+  quixotic
+  nouns
+  zora_v3           @map("zora-v3")
+  cryptopunks
+  mint
+  universe
+  sudoswap
+  nftx
+  thebards
+}
+
+enum order_side_t {
+  buy
+  sell
+  bundle
+}
+
+enum token_floor_sell_event_kind_t {
+  bootstrap
+  new_order       @map("new-order")
+  expiry
+  sale
+  cancel
+  balance_change  @map("balance-change")
+  approval_change @map("approval-change")
+  revalidation
+  reprice
+}

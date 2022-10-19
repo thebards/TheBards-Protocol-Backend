@@ -1,0 +1,14 @@
+schema: './src/graphqls/schema.graphql'
+generates:
+    ./src/graphqls/generated.ts:
+    plugins:
+      - typescript
+      - typescript-operations
+      - typed-document-node
+      - fragment-matcher
+    config:
+      useIndexSignature: true
+      # Note, this file path starts from the location of the 
+      # file where you generate types. 
+      # (i.e., `/src/graphqls/generated.ts` above) 
+      # contextType: "../index#MyContext"
