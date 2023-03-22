@@ -4,14 +4,25 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start":  "node src/",
+    "start": "node src/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["Grapghql", "API", "Node.js", "Prisma", "Postgres", "Docker"],
+  "keywords": [
+    "Grapghql",
+    "API",
+    "Node.js",
+    "Prisma",
+    "Postgres",
+    "Docker"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^4.11.0",
     "apollo-server": "^3.12.0",
     "graphql": "^16.6.0"
+  },
+  "devDependencies": {
+    "prisma": "^4.11.0"
   }
 }
